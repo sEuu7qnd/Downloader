@@ -1,0 +1,13 @@
+# Archivos de caché de Python
+__pycache__/
+*.pyc
+
+# Archivos de registro y configuración local
+*.log
+cookies.txt
+config.json
+
+# Carpetas de PyInstaller (para cuando crees el .exe)
+build/
+dist/
+*.spec

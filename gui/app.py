@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, List
 
 from config import Config, APP_NAME
-from core import BITRATES, RESOLUCIONES, AUDIO, VIDEO, cargar_motor, ejecutar, _motor_listo, _motor_error
+from core import BITRATES, RESOLUCIONES, AUDIO, VIDEO, cargar_motor, ejecutar
 from gui import widgets
 from gui.widgets import Boton, Interruptor, Nav, Segmentado, Tarjeta, Barra, P, F
 

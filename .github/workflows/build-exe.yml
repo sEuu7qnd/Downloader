@@ -1,0 +1,89 @@
+name: Compilar Downloader
+
+on:
+  workflow_dispatch:      # botón "Run workflow" en la pestaña Actions
+  push:
+    branches: [main]
+    paths:
+      - main.py
+      - core.py
+      - config.py
+      - logs.py
+      - gui/**
+      - requirements.txt
+      - .github/workflows/build-exe.yml
+
+permissions:
+  contents: write         # necesario para publicar la Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        # [default] incluye yt-dlp-ejs: el script que resuelve el desafío JavaScript de YouTube
+        run: python -m pip install --upgrade pip "yt-dlp[default]" imageio-ffmpeg pyinstaller
+
+      # Versión en carpeta: abre y cierra al instante (no desempaca nada en cada inicio)
+      - name: Compilar versión en carpeta (arranque rápido)
+        run: >
+          python -m PyInstaller --noconfirm --clean --onedir --noconsole
+          --name Downloader
+          --collect-submodules yt_dlp
+          --collect-all imageio_ffmpeg
+          --collect-all yt_dlp_ejs
+          --paths .
+          --hidden-import gui.app
+          main.py
+
+      # Versión de un solo archivo: cómoda de mover, pero desempaca ~100 MB en cada inicio
+      - name: Compilar versión de un solo archivo
+        run: >
+          python -m PyInstaller --noconfirm --clean --onefile --noconsole
+          --name Downloader
+          --distpath dist-unico --workpath build-unico
+          --collect-submodules yt_dlp
+          --collect-all imageio_ffmpeg
+          --collect-all yt_dlp_ejs
+          --paths .
+          --hidden-import gui.app
+          main.py
+
+      - name: Preparar archivos para publicar
+        run: |
+          Compress-Archive -Path dist/Downloader -DestinationPath Downloader-carpeta-rapida.zip -Force
+          Copy-Item dist-unico/Downloader.exe Downloader-un-solo-archivo.exe
+
+      - name: Subir carpeta (arranque rápido)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Downloader-carpeta-rapida
+          path: dist/Downloader
+          if-no-files-found: error
+
+      - name: Subir un solo archivo
+        uses: actions/upload-artifact@v4
+        with:
+          name: Downloader-un-solo-archivo
+          path: dist-unico/Downloader.exe
+          if-no-files-found: error
+
+      # Publica (o reemplaza) la Release "latest" con los dos programas y sus huellas SHA-256
+      - name: Publicar en Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          try { gh release delete latest --yes --cleanup-tag *> $null } catch { }
+          $global:LASTEXITCODE = 0
+          $h1 = (Get-FileHash Downloader-carpeta-rapida.zip -Algorithm SHA256).Hash
+          $h2 = (Get-FileHash Downloader-un-solo-archivo.exe -Algorithm SHA256).Hash
+          $notas = "Compilado automáticamente desde el commit ${{ github.sha }}.`n`nSHA-256`n- Downloader-carpeta-rapida.zip: $h1`n- Downloader-un-solo-archivo.exe: $h2"
+          gh release create latest Downloader-carpeta-rapida.zip Downloader-un-solo-archivo.exe --title "Downloader (última versión)" --notes $notas --target ${{ github.sha }} --latest

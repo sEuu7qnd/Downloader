@@ -178,7 +178,8 @@ def indexar_existentes(yt: Any, aj: Dict[str, Any], url: str, registro: Any) -> 
     try:
         with yt.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False) or {}
-            entradas = [e for e in (info.get("entries") or []) if e and e.get("id")]
+            # Se conserva la posición REAL en la lista (playlist_items usa esa numeración)
+            entradas = [(i, e) for i, e in enumerate(info.get("entries") or [], 1) if e and e.get("id")]
             if not entradas:
                 return set(), 0, defecto, "", None
             titulo = info.get("title") or "NA"
@@ -187,11 +188,11 @@ def indexar_existentes(yt: Any, aj: Dict[str, Any], url: str, registro: Any) -> 
             def ruta_de(e: Dict[str, Any]) -> Path:
                 return Path(ydl.prepare_filename({**e, **base}))
 
-            carpeta_sub = ruta_de(entradas[0]).parent
+            carpeta_sub = ruta_de(entradas[0][1]).parent
             en_raiz = _nombres_en(destino)
             en_sub = _nombres_en(carpeta_sub)
             ids_raiz, ids_sub = set(), set()
-            for e in entradas:
+            for _, e in entradas:
                 nombre = ruta_de(e).name
                 norm = normalizar_nombre_archivo(nombre)
                 if norm in en_raiz:
@@ -208,7 +209,7 @@ def indexar_existentes(yt: Any, aj: Dict[str, Any], url: str, registro: Any) -> 
                 nota = "Se usa la carpeta elegida (contiene elementos de esta lista)."
             plantilla = PLANTILLA_LISTA if usar_sub else PLANTILLA_PLANA
             ya = ids_raiz | ids_sub
-            pendientes = [i for i, e in enumerate(entradas, 1) if e["id"] not in ya]
+            pendientes = [i for i, e in entradas if e["id"] not in ya]
             return ya, len(entradas), plantilla, nota, pendientes
     except Exception as err:
         logger.error("Error al indexar elementos existentes: %s", err)
@@ -307,7 +308,7 @@ def ejecutar(urls: List[str], aj: Dict[str, Any], emit: Callable[[str, Any, Opti
             ahora = time.monotonic()
             if ahora - estado["t"] < 0.12:
                 return
-            estado["t"] = me = ahora
+            estado["t"] = ahora
             total = d.get("total_bytes") or d.get("total_bytes_estimate")
             frac = (d.get("downloaded_bytes") or 0) / total if total else 0.0
             frac = min(max(frac, 0.0), 1.0)
